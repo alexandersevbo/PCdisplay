@@ -106,14 +106,17 @@ int PCdata[20];        // массив численных значений по�
 byte PLOTmem[6][16];   // массив для хранения данных для построения графика (16 значений для 6 параметров)
 byte blocks, halfs;
 byte index = 0;
-int display_mode = 6;
+//int display_mode = 6;
+int display_mode = 7; // модернизированный
+
+
 String string_convert;
 unsigned long timeout, uptime_timer, plot_timer;
 boolean lightState, reDraw_flag = 1, updateDisplay_flag, updateTemp_flag, timeOut_flag = 1;
 int duty, LEDcolor;
 int k, b, R, G, B, Rf, Gf, Bf;
 byte mainTemp;
-byte lines[] = {4, 5, 7, 6};
+byte lines[] = {4, 6}; // НАбор номеров параметров для вычисления параметра при рисовании столбиков для одной и второй строки (((( сложно как
 byte plotLines[] = {0, 1, 4, 5, 6, 7};    // 0-CPU temp, 1-GPU temp, 2-CPU load, 3-GPU load, 4-RAM load, 5-GPU memory
 String perc;
 unsigned long sec, mins, hrs;
@@ -158,12 +161,12 @@ void setup() {
   lcd.backlight();
   lcd.clear();            // очистить дисплей
   show_logo();            // показать логотип
-  delay(2000);
+  //delay(2000);
   lcd.clear();            // очистить дисплей
   show_logo2();            // показать логотип
 
-  Timer1.pwm(FAN_PIN, 400);  // включить вентиляторы на 40%
-  delay(2000);               // на 2 секунды
+  //Timer1.pwm(FAN_PIN, 400);  // включить вентиляторы на 40%
+  //delay(2000);               // на 2 секунды
   lcd.clear();               // очистить дисплей
   PCdata[8] = speedMAX;
   PCdata[9] = speedMIN;
@@ -420,29 +423,45 @@ void draw_stats_11() {
   }
 }
 
+
+
+
+// переделана для процессора и памяти. Растянута шкала
 void draw_stats_12() {
-  lcd.setCursor(13, 0); lcd.print(PCdata[7]);
-  if (PCdata[7] < 10) perc = "% ";
-  else if (PCdata[7] < 100) perc = "%";
+
+  PCdata[4] = PCdata[4] + 1; // коррекция. ПОчему то значение меньше, чем в Диспетчере
+  lcd.setCursor(13, 0); lcd.print(PCdata[4]);
+  if (PCdata[4] < 10) perc = "% ";
+  else if (PCdata[4] < 100) perc = "%";
   else perc = "";  lcd.print(perc);
+
+  PCdata[6] = PCdata[6] + 1; // коррекция. ПОчему то значение меньше, чем в Диспетчере
   lcd.setCursor(13, 1); lcd.print(PCdata[6]);
   if (PCdata[6] < 10) perc = "% ";
   else if (PCdata[6] < 100) perc = "%";
   else perc = "";  lcd.print(perc);
 
-  for (int i = 0; i < 2; i++) {
-    byte line = ceil(PCdata[lines[i + 2]] / 16);
-    lcd.setCursor(7, i);
+
+  for (int i = 0; i < 2; i++) { // перебор для первой и второй строки дисплея
+    byte line = ceil(PCdata[lines[i]] / 10);
+    
+    lcd.setCursor(3, i);
+    
     if (line == 0) lcd.printByte(1)
       else lcd.printByte(4);
-    for (int n = 1; n < 5; n++) {
+      
+    for (int n = 1; n < 9; n++) {
       if (n < line) lcd.printByte(4);
       if (n >= line) lcd.printByte(2);
     }
-    if (line == 6) lcd.printByte(4)
+    
+    if (line == 10) lcd.printByte(4)
       else lcd.printByte(3);
   }
 }
+
+
+
 
 void draw_stats_21() {
   lcd.setCursor(13, 0); lcd.print(duty);
@@ -489,10 +508,13 @@ void draw_labels_11() {
   lcd.createChar(3, right_empty);
   lcd.createChar(4, row8);
   lcd.setCursor(0, 0);
-  lcd.print("CPU:");
+  lcd.print("CPU");
   lcd.setCursor(0, 1);
   lcd.print("GPU:");
 }
+
+
+
 void draw_labels_12() {
   lcd.createChar(0, degree);
   lcd.createChar(1, left_empty);
@@ -500,10 +522,13 @@ void draw_labels_12() {
   lcd.createChar(3, right_empty);
   lcd.createChar(4, row8);
   lcd.setCursor(0, 0);
-  lcd.print("GPUmem:");
+  lcd.print("CPU");
   lcd.setCursor(0, 1);
-  lcd.print("RAMuse:");
+  lcd.print("RAM");
 }
+
+
+
 void draw_labels_21() {
   lcd.createChar(0, degree);
   lcd.createChar(1, left_empty);
