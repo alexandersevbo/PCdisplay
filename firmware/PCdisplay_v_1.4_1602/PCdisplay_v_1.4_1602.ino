@@ -1,4 +1,7 @@
 /*
+ * можно еще допилить - почистить код от термодатчиков и прочего.
+ * добавить отключение света и прочего при засыпании компа
+ * 
   Модифицировано под дисплей 1602 klykov.net vk.com/ms262 instagram.com/klykovnet
 
   Блок электроники для крутого моддинга вашего ПК, возможности:
@@ -83,14 +86,19 @@ byte logo2[8] = {0b11100, 0b11000,  0b10001,  0b11011,  0b11111,  0b11100,  0b00
 byte logo3[8] = {0b00000, 0b00001,  0b00011,  0b00111,  0b01101,  0b00111,  0b00010,  0b00000};
 byte logo4[8] = {0b11111, 0b11111,  0b11011,  0b10001,  0b00000,  0b00000,  0b00000,  0b00000};
 byte logo5[8] = {0b00000, 0b10000,  0b11000,  0b11100,  0b11110,  0b11100,  0b01000,  0b00000};
+
 // значок градуса!!!! lcd.write(223);
 byte degree[8] = {0b11100,  0b10100,  0b11100,  0b00000,  0b00000,  0b00000,  0b00000,  0b00000};
+
 // правый край полосы загрузки
 byte right_empty[8] = {0b11111,  0b00001,  0b00001,  0b00001,  0b00001,  0b00001,  0b00001,  0b11111};
+
 // левый край полосы загрузки
 byte left_empty[8] = {0b11111,  0b10000,  0b10000,  0b10000,  0b10000,  0b10000,  0b10000,  0b11111};
+
 // центр полосы загрузки
 byte center_empty[8] = {0b11111, 0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b11111};
+
 // блоки для построения графиков
 byte row8[8] = {0b11111,  0b11111,  0b11111,  0b11111,  0b11111,  0b11111,  0b11111,  0b11111};
 byte row7[8] = {0b00000,  0b11111,  0b11111,  0b11111,  0b11111,  0b11111,  0b11111,  0b11111};
@@ -100,6 +108,10 @@ byte row4[8] = {0b00000,  0b00000,  0b00000,  0b00000,  0b11111,  0b11111,  0b11
 byte row3[8] = {0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b11111,  0b11111,  0b11111};
 byte row2[8] = {0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b11111,  0b11111};
 byte row1[8] = {0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b00000,  0b11111};
+
+
+
+
 
 char inData[82];       // массив входных значений (СИМВОЛЫ)
 int PCdata[20];        // массив численных значений показаний с компьютера
@@ -143,47 +155,24 @@ static const char *plotNames1[]  = {
 void setup() {
   Serial.begin(9600);
   Timer1.initialize(40);   // поставить частоту ШИМ 25 кГц (40 микросекунд)
-  pinMode(R_PIN, OUTPUT);
-  pinMode(G_PIN, OUTPUT);
-  pinMode(B_PIN, OUTPUT);
-  digitalWrite(R_PIN, 0);
-  digitalWrite(G_PIN, 0);
-  digitalWrite(B_PIN, 0);
-  pinMode(BTN1, INPUT_PULLUP);
-  pinMode(BTN2, INPUT_PULLUP);
-  sensors.begin();
-  sensors.getAddress(Thermometer1, 0);
-  sensors.getAddress(Thermometer2, 1);
-  sensors.setResolution(Thermometer1, TEMPERATURE_PRECISION);
-  sensors.setResolution(Thermometer2, TEMPERATURE_PRECISION);
+
   // инициализация дисплея
   lcd.init();
   lcd.backlight();
   lcd.clear();            // очистить дисплей
-  show_logo();            // показать логотип
-  //delay(2000);
-  lcd.clear();            // очистить дисплей
-  show_logo2();            // показать логотип
 
-  //Timer1.pwm(FAN_PIN, 400);  // включить вентиляторы на 40%
-  //delay(2000);               // на 2 секунды
-  lcd.clear();               // очистить дисплей
-  PCdata[8] = speedMAX;
-  PCdata[9] = speedMIN;
-  PCdata[10] = tempMAX;
-  PCdata[11] = tempMIN;
 }
-// 8-maxFAN, 9-minFAN, 10-maxTEMP, 11-minTEMP, 12-mnlFAN
+
 
 // ------------------------------ ОСНОВНОЙ ЦИКЛ -------------------------------
 void loop() {
   parsing();                          // парсим строки с компьютера
   updatePlot();                       // обновляем массив данных графика
-  getTemperature();                   // получить значения с датчиков температуры
-  dutyCalculate();                    // посчитать скважность для вентиляторов
-  Timer1.pwm(FAN_PIN, duty * 10);     // управлять вентиляторами
-  LEDcontrol();                       // управлять цветом ленты
-  buttonsTick();                      // опрос кнопок и смена режимов
+//  getTemperature();                   // получить значения с датчиков температуры
+//  dutyCalculate();                    // посчитать скважность для вентиляторов
+//  Timer1.pwm(FAN_PIN, duty * 10);     // управлять вентиляторами
+//  LEDcontrol();                       // управлять цветом ленты
+//  buttonsTick();                      // опрос кнопок и смена режимов
   updateDisplay();                    // обновить показания на дисплее
   timeoutTick();                      // проверка таймаута
 }
@@ -335,6 +324,7 @@ void parsing() {
     }
     timeout = millis();
     timeOut_flag = 1;
+    reDraw_flag = 1;
   }
 }
 void updatePlot() {
@@ -351,75 +341,24 @@ void updatePlot() {
     plot_timer = millis();
   }
 }
+
+
 void updateDisplay() {
+
+
+  
   if (updateDisplay_flag) {
-    if (reDraw_flag) {
-      lcd.clear();
-      switch (display_mode) {
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5: draw_plot_symb();
-          break;
-        case 6: draw_labels_11();
-          break;
-        case 7: draw_labels_12();
-          break;
-        case 8: draw_labels_21();
-          break;
-        case 9: draw_labels_22();
-          break;
-      }
-      reDraw_flag = 0;
-    }
-    switch (display_mode) {
-      case 0:
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-      case 5: draw_plot();
-        break;
-      case 6: draw_stats_11();
-        break;
-      case 7: draw_stats_12();
-        break;
-      case 8: draw_stats_21();
-        break;
-      case 9: draw_stats_22();
-        break;
-      case 50: debug();
-        break;
-    }
+//    lcd.clear();
+    draw_labels_12();
     updateDisplay_flag = 0;
-  }
-}
+    if (reDraw_flag) {
+      
+      
+      draw_stats_12();
+      reDraw_flag = 0;
+      
 
-void draw_stats_11() {
-  lcd.setCursor(4, 0); lcd.print(PCdata[0]); lcd.write(223);
-  lcd.setCursor(13, 0); lcd.print(PCdata[4]);
-  if (PCdata[4] < 10) perc = "% ";
-  else if (PCdata[4] < 100) perc = "%";
-  else perc = "";  lcd.print(perc);
-  lcd.setCursor(4, 1); lcd.print(PCdata[1]); lcd.write(223);
-  lcd.setCursor(13, 1); lcd.print(PCdata[5]);
-  if (PCdata[5] < 10) perc = "% ";
-  else if (PCdata[5] < 100) perc = "%";
-  else perc = "";  lcd.print(perc);
-
-  for (int i = 0; i < 2; i++) {
-    byte line = ceil(PCdata[lines[i]] / 16);
-    lcd.setCursor(7, i);
-    if (line == 0) lcd.printByte(1)
-      else lcd.printByte(4);
-    for (int n = 1; n < 5; n++) {
-      if (n < line) lcd.printByte(4);
-      if (n >= line) lcd.printByte(2);
     }
-    if (line == 6) lcd.printByte(4)
-      else lcd.printByte(3);
   }
 }
 
@@ -452,6 +391,7 @@ void draw_stats_12() {
       
     for (int n = 1; n < 9; n++) {
       if (n < line) lcd.printByte(4);
+      
       if (n >= line) lcd.printByte(2);
     }
     
@@ -463,200 +403,72 @@ void draw_stats_12() {
 
 
 
-void draw_stats_21() {
-  lcd.setCursor(13, 0); lcd.print(duty);
-  if ((duty) < 10) perc = "% ";
-  else if ((duty) < 100) perc = "%";
-  else perc = "";  lcd.print(perc);
-
-  lcd.setCursor(3, 1); lcd.print(temp1); lcd.write(223);
-  lcd.setCursor(11, 1); lcd.print(temp2); lcd.write(223);
-
-  byte line = ceil(duty / 16);
-  lcd.setCursor(6, 0);
-  if (line == 0) lcd.printByte(1)
-    else lcd.printByte(4);
-  for (int n = 1; n < 5; n++) {
-    if (n < line) lcd.printByte(4);
-    if (n >= line) lcd.printByte(2);
-  }
-  if (line == 6) lcd.printByte(4)
-    else lcd.printByte(3);
-}
-void draw_stats_22() {
-  lcd.setCursor(2, 0); lcd.print(PCdata[2]); lcd.write(223);
-  lcd.setCursor(10, 0); lcd.print(PCdata[3]); lcd.write(223);
-
-  lcd.setCursor(7, 1);
-  sec = (long)(millis() - uptime_timer) / 1000;
-  hrs = floor((sec / 3600));
-  mins = floor(sec - (hrs * 3600)) / 60;
-  sec = sec - (hrs * 3600 + mins * 60);
-  if (hrs < 10) lcd.print(0);
-  lcd.print(hrs);
-  lcd.print(":");
-  if (mins < 10) lcd.print(0);
-  lcd.print(mins);
-  lcd.print(":");
-  if (sec < 10) lcd.print(0);
-  lcd.print(sec);
-}
-void draw_labels_11() {
-  lcd.createChar(0, degree);
-  lcd.createChar(1, left_empty);
-  lcd.createChar(2, center_empty);
-  lcd.createChar(3, right_empty);
-  lcd.createChar(4, row8);
-  lcd.setCursor(0, 0);
-  lcd.print("CPU");
-  lcd.setCursor(0, 1);
-  lcd.print("GPU:");
-}
-
-
-
 void draw_labels_12() {
   lcd.createChar(0, degree);
   lcd.createChar(1, left_empty);
   lcd.createChar(2, center_empty);
   lcd.createChar(3, right_empty);
   lcd.createChar(4, row8);
+
   lcd.setCursor(0, 0);
   lcd.print("CPU");
   lcd.setCursor(0, 1);
   lcd.print("RAM");
 }
 
+//
+//void draw_legend() {
+//  byte data = PCdata[plotLines[display_mode]];
+//  lcd.setCursor(10, 0); lcd.print(data);
+//  if (display_mode > 1) {
+//    if (data < 10) perc = "% ";
+//    else if (data < 100) perc = "%";
+//    else {
+//      perc = "";
+//    }
+//    lcd.print(perc);
+//  } else {
+//    if (data < 10) {
+//      lcd.write(223);
+//      lcd.print("  ");
+//    } else if (data < 100) {
+//      lcd.write(223); lcd.print(" ");
+//    } else {
+//      lcd.write(223);
+//    }
+//  }
+//}
 
-
-void draw_labels_21() {
-  lcd.createChar(0, degree);
-  lcd.createChar(1, left_empty);
-  lcd.createChar(2, center_empty);
-  lcd.createChar(3, right_empty);
-  lcd.createChar(4, row8);
-
-  lcd.setCursor(0, 0);
-  lcd.print("FANsp:");
-  lcd.setCursor(0, 1);
-  lcd.print("T1: ");
-  lcd.setCursor(8, 1);
-  lcd.print("T2:");
-}
-void draw_labels_22() {
-  lcd.createChar(0, degree);
-  lcd.createChar(1, left_empty);
-  lcd.createChar(2, center_empty);
-  lcd.createChar(3, right_empty);
-  lcd.createChar(4, row8);
-
-  lcd.setCursor(0, 0);
-  lcd.print("M:");
-  lcd.setCursor(7, 0);
-  lcd.print("HM:");
-  lcd.setCursor(0, 1);
-  lcd.print("UPTIME:");
-}
-void draw_legend() {
-  byte data = PCdata[plotLines[display_mode]];
-  lcd.setCursor(10, 0); lcd.print(data);
-  if (display_mode > 1) {
-    if (data < 10) perc = "% ";
-    else if (data < 100) perc = "%";
-    else {
-      perc = "";
-    }
-    lcd.print(perc);
-  } else {
-    if (data < 10) {
-      lcd.write(223);
-      lcd.print("  ");
-    } else if (data < 100) {
-      lcd.write(223); lcd.print(" ");
-    } else {
-      lcd.write(223);
-    }
-  }
-}
-
-void draw_plot() {
-  draw_legend();
-
-  lcd.setCursor(0, 1);
-  for (int i = 0; i < 16; i++) {
-    lcd.printByte(constrain(map(PLOTmem[display_mode][i], 0, 100, 0, 7), 0, 7));
-  }
-}
-
-void draw_plot_symb() {
-  lcd.createChar(0, row1);
-  lcd.createChar(1, row2);
-  lcd.createChar(2, row3);
-  lcd.createChar(3, row4);
-  lcd.createChar(4, row5);
-  lcd.createChar(5, row6);
-  lcd.createChar(6, row7);
-  lcd.createChar(7, row8);
-  lcd.setCursor(0, 0);
-  lcd.print(plotNames0[display_mode]);
-  lcd.setCursor(3, 0);
-  lcd.print(plotNames1[display_mode]);
-  lcd.print(": ");
-}
+//void draw_plot() {
+//  draw_legend();
+//
+//  lcd.setCursor(0, 1);
+//  for (int i = 0; i < 16; i++) {
+//    lcd.printByte(constrain(map(PLOTmem[display_mode][i], 0, 100, 0, 7), 0, 7));
+//  }
+//}
+//
+//void draw_plot_symb() {
+//  lcd.createChar(0, row1);
+//  lcd.createChar(1, row2);
+//  lcd.createChar(2, row3);
+//  lcd.createChar(3, row4);
+//  lcd.createChar(4, row5);
+//  lcd.createChar(5, row6);
+//  lcd.createChar(6, row7);
+//  lcd.createChar(7, row8);
+//  lcd.setCursor(0, 0);
+//  lcd.print(plotNames0[display_mode]);
+//  lcd.setCursor(3, 0);
+//  lcd.print(plotNames1[display_mode]);
+//  lcd.print(": ");
+//}
 void timeoutTick() {
-  if ((millis() - timeout > 5000) && timeOut_flag) {
+  if ((millis() - timeout > 1000) && timeOut_flag) {
     lcd.clear();
     lcd.setCursor(3, 0);
     lcd.print("NO DATA");
-//    lcd.setCursor(5, 1);
-//    lcd.print("FAILED");
     timeOut_flag = 0;
     reDraw_flag = 1;
-//    if (!ERROR_BACKLIGHT) lcd.noBacklight();   // вырубить подсветку, если разрешено
-  }
-}
-void show_logo() {
-  lcd.createChar(0, logo0);
-  lcd.createChar(1, logo1);
-  lcd.createChar(2, logo2);
-  lcd.createChar(3, logo3);
-  lcd.createChar(4, logo4);
-  lcd.createChar(5, logo5);
-  lcd.setCursor(0, 0);
-  lcd.printByte(0);
-  lcd.printByte(1);
-  lcd.printByte(2);
-  lcd.setCursor(0, 1);
-  lcd.printByte(3);
-  lcd.printByte(4);
-  lcd.printByte(5);
-  lcd.setCursor(4, 0);
-  lcd.print("AlexGyver");
-  lcd.setCursor(4, 1);
-  lcd.print("Technologies");
-}
-void show_logo2() {
-  lcd.setCursor(1, 0);
-  lcd.print("modified by");
-  lcd.setCursor(5, 1);
-  lcd.print("klykov.net");
-}
-void debug() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  for (int j = 0; j < 5; j++) {
-    lcd.print(PCdata[j]); lcd.print("  ");
-  }
-  lcd.setCursor(0, 1);
-  for (int j = 6; j < 10; j++) {
-    lcd.print(PCdata[j]); lcd.print("  ");
-  }
-  lcd.setCursor(0, 2);
-  for (int j = 10; j < 15; j++) {
-    lcd.print(PCdata[j]); lcd.print("  ");
-  }
-  lcd.setCursor(0, 3);
-  for (int j = 15; j < 18; j++) {
-    lcd.print(PCdata[j]); lcd.print("  ");
   }
 }
